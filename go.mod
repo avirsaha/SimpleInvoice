@@ -1,5 +1,5 @@
 module github.com/avirsaha/SimpleInvoice/tree/stable-go
 
-go 1.21
+go 1.24.5
 
-require github.com/ledongthuc/pdf v0.0.0-20240529092850-2521c0827233
+require github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
