@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"simple_invoice/internal/extractor"
+	"github.com/avirsaha/SimpleInvoice/tree/stable-go/internal/extractor"
 )
 
 // setupCORS enables Cross-Origin Resource Sharing for the frontend.
