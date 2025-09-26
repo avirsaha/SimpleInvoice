@@ -40,8 +40,7 @@ var (
 	reGST          = regexp.MustCompile(`(?i)GST(?:IN)?(?: Registration)? No\s*[:\-]?\s*(\S+)`)
 	reTaxAndTotal  = regexp.MustCompile(`(?i)TOTAL\s*[:\-]?\s*.*?([\d,]+\.\d{2})\s*.*?([\d,]+\.\d{2})`)
 	reHSN          = regexp.MustCompile(`(?i)HSN\s*[:\-]?\s*(\d+)`)
-	reUCodeParens  = regexp.MustCompile(`\(\s*([A-Z0-9\-]{6,})\s*\)`)
-	reUCodeAlt     = regexp.MustCompile(`\|\s*([A-Z0-9]{8,})\s*\(`)
+	reUCode     = regexp.MustCompile(`\|\s*([A-Z0-9]{8,})\s*\(`)
 	reBillingBlock = regexp.MustCompile(`(?is)Billing Address\s*:\s*(.*?)\s*(?:Shipping Address|Invoice Number|State/UT Code)`)
 )
 
@@ -72,12 +71,7 @@ func ExtractDetails(file io.Reader) (*InvoiceDetails, error) {
 	details.OrderDate = findStringSubmatchAndClean(reOrderDate, simpleText, 1)
 	details.StateCode = findStringSubmatchAndClean(reStateCode, simpleText, 1)
 	details.HSN = findStringSubmatchAndClean(reHSN, simpleText, 1)
-
-	// Attempt to find UCode with two different patterns.
-	details.UCode = findStringSubmatchAndClean(reUCodeParens, simpleText, 1)
-	if details.UCode == "" {
-		details.UCode = findStringSubmatchAndClean(reUCodeAlt, simpleText, 1)
-	}
+	details.UCode = findStringSubmatchAndClean(reUCode, simpleText, 1)
 
 	// Extract Tax and Total amounts from the "TOTAL" line.
 	if match := reTaxAndTotal.FindStringSubmatch(simpleText); len(match) >= 3 {
@@ -124,12 +118,12 @@ func extractTextWithPython(reader io.Reader, mode string) (string, error) {
 	}
 
 	// Sanitize the script path to prevent directory traversal vulnerabilities.
-	scriptPath, err := filepath.Abs(filepath.Join("..", "..", "tools", "pdf_text_extractor.py"))
+	scriptPath, err := filepath.Abs(filepath.Join("tools", "pdf_text_extractor.py"))
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve absolute script path: %w", err)
 	}
 
-	cmd := exec.Command("python3", scriptPath, tmpFile.Name(), "--mode="+mode)
+	cmd := exec.Command("./tools/venv/bin/python3", scriptPath, tmpFile.Name(), "--mode="+mode)
 	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr // Capture stderr for better error reporting.
