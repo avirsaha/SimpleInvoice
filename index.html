@@ -1,250 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Invoice Extractor</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom styles for the result box for better readability */
-        .result-key { color: #94a3b8; /* slate-400 */ }
-        .result-value { color: #f1f5f9; /* slate-100 */ }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Invoice Extractor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; }
+    #status-log.shown {
+      opacity: 1;
+    }
+    #status-log {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+  </style>
 </head>
-<body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
 
-    <div class="w-full max-w-6xl mx-auto p-4 md:p-8">
-        <div class="bg-slate-800 rounded-xl shadow-2xl p-6 md:p-8 border border-slate-700">
-
-            <div class="text-center mb-4">
-                <h1 class="text-3xl font-bold text-blue-400">Simple Invoice</h1>
-                <p class="text-slate-400 mt-2">Upload an invoice PDF to automatically extract key details.</p>
-            </div>
-
-            <div class="text-xs text-slate-500 mb-6 text-center">
-                <p>
-                    <strong class="text-slate-400">Privacy Notice:</strong> Your file is processed temporarily in-memory for extraction only. <br class="hidden sm:inline" />
-                    No data or documents are stored or saved.
-                </p>
-            </div>
-
-            <div id="upload-container">
-                <form id="upload-form" class="mb-6">
-                    <div class="flex flex-col items-center justify-center w-full">
-                        <label for="pdf-file" id="upload-label" class="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-600 border-dashed rounded-lg cursor-pointer bg-slate-700 hover:bg-slate-600 transition-all duration-300">
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <svg class="w-8 h-8 mb-2 text-slate-400" aria-hidden="true" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
-                                </svg>
-                                <p class="mb-1 text-sm text-slate-400"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-                                <p class="text-xs text-slate-500">PDF only</p>
-                            </div>
-                            <input id="pdf-file" type="file" class="hidden" accept="application/pdf" />
-                        </label>
-                        <p id="file-name" class="mt-2 text-sm text-slate-400 h-5"></p> </div>
-                </form>
-            </div>
-
-
-            <div id="status-container">
-                <div id="loading-spinner" class="hidden text-center mb-6">
-                     <svg class="inline w-8 h-8 text-blue-400 animate-spin" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="#374151"/>
-                        <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentColor"/>
-                    </svg>
-                    <p class="mt-2 text-slate-400">Extracting data...</p>
-                </div>
-
-                <div id="error-message" class="hidden p-4 text-sm text-red-300 bg-red-900/50 rounded-lg mb-6" role="alert">
-                    <span class="font-medium">Error:</span> <span id="error-text"></span>
-                </div>
-
-                <div id="results-container" class="hidden">
-                    <div class="grid md:grid-cols-2 gap-8 items-start mt-6">
-                        <div>
-                            <div class="flex justify-between items-center mb-2">
-                                 <h2 class="text-lg font-semibold text-blue-300">Extracted Data</h2>
-                                 <button id="reset-button" class="text-sm bg-slate-600 hover:bg-slate-500 text-slate-300 font-semibold py-1 px-3 rounded-lg transition-colors">
-                                     Reset
-                                 </button>
-                            </div>
-                            <div id="results" class="bg-slate-700/50 p-4 rounded-lg space-y-2 text-sm font-mono border border-slate-700 min-h-[500px]">
-                                </div>
-                        </div>
-                        <div class="bg-slate-700 rounded-lg overflow-hidden border border-slate-700">
-                            <h2 class="text-lg font-semibold text-blue-300 mb-2 px-4 pt-4">Invoice Preview</h2>
-                            <iframe id="pdf-preview" type="application/pdf" class="w-full h-[500px]"></iframe>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
+  <div class="bg-white shadow-lg rounded-xl p-8 max-w-3xl w-full">
+    
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-indigo-600">Invoice Extractor</h1>
+      <p class="text-sm text-gray-500 mt-1">Upload PDFs to extract data and download Excel files</p>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- DOM Element Constants ---
-            const uploadContainer = document.getElementById('upload-container');
-            const uploadLabel = document.getElementById('upload-label');
-            const pdfFileInput = document.getElementById('pdf-file');
-            const fileNameDisplay = document.getElementById('file-name');
-            const loadingSpinner = document.getElementById('loading-spinner');
-            const errorMessage = document.getElementById('error-message');
-            const errorText = document.getElementById('error-text');
-            const resultsContainer = document.getElementById('results-container');
-            const resultsDiv = document.getElementById('results');
-            const pdfPreview = document.getElementById('pdf-preview');
-            const resetButton = document.getElementById('reset-button');
-            const API_ENDPOINT = 'https://ungrafted-martha-iced.ngrok-free.dev/extract/';
+    <!-- Buttons -->
+    <div class="flex justify-center space-x-4 mb-4">
+      <label class="cursor-pointer inline-block px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700">
+        Upload Files
+        <input id="file-input" type="file" multiple accept="application/pdf" class="hidden" />
+      </label>
 
-            // --- UI State Management ---
-            /**
-             * Updates the UI to reflect the current application state.
-             * @param {'idle' | 'loading' | 'error' | 'success'} state - The state to display.
-             * @param {string | object} [data] - The error message or results data.
-             */
-            function updateUIState(state, data) {
-                // Hide all sections by default
-                loadingSpinner.classList.add('hidden');
-                errorMessage.classList.add('hidden');
-                resultsContainer.classList.add('hidden');
-                uploadContainer.classList.remove('hidden');
+      <label class="cursor-pointer inline-block px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded hover:bg-indigo-600">
+        Upload Folder
+        <input id="folder-input" type="file" webkitdirectory directory multiple class="hidden" />
+      </label>
+    </div>
 
-                switch (state) {
-                    case 'loading':
-                        loadingSpinner.classList.remove('hidden');
-                        uploadContainer.classList.add('hidden');
-                        break;
-                    case 'error':
-                        errorText.textContent = data;
-                        errorMessage.classList.remove('hidden');
-                        break;
-                    case 'success':
-                        displayResults(data.results);
-                        pdfPreview.src = data.fileURL;
-                        resultsContainer.classList.remove('hidden');
-                        uploadContainer.classList.add('hidden');
-                        break;
-                    case 'idle':
-                    default:
-                        pdfFileInput.value = ''; // Clear the file input
-                        fileNameDisplay.textContent = '';
-                        resultsDiv.innerHTML = '';
-                        pdfPreview.src = 'about:blank';
-                        uploadLabel.classList.remove('border-blue-500', 'bg-slate-600');
-                        break;
-                }
-            }
-            
-            // --- File Processing ---
-            /**
-             * Validates the file and initiates the upload process.
-             * @param {File} file - The file to process.
-             */
-            function processFile(file) {
-                if (!file) return;
+    <!-- Drag & Drop -->
+    <div id="drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center bg-gray-50 hover:border-indigo-500 cursor-pointer">
+      <p class="text-sm text-gray-600">
+        <span class="text-indigo-600 font-semibold">Click buttons above</span> or drag & drop PDF files/folders here
+      </p>
+    </div>
 
-                // Validate file type
-                if (file.type !== 'application/pdf') {
-                    updateUIState('error', 'Invalid file type. Please upload a PDF.');
-                    return;
-                }
-                
-                fileNameDisplay.textContent = file.name;
-                handleFileUpload(file);
-            }
+    <!-- Status Log -->
+    <div id="status-log" class="mt-4 text-sm text-gray-700 font-medium min-h-[1.5rem]"></div>
 
-            /**
-             * Uploads the file to the API and handles the response.
-             * @param {File} file - The file to upload.
-             */
-            async function handleFileUpload(file) {
-                updateUIState('loading');
-                const formData = new FormData();
-                formData.append('file', file);
+    <!-- Error Message -->
+    <div id="error-message" class="hidden mt-4 text-sm text-red-600 font-medium"></div>
 
-                try {
-                    const response = await fetch(API_ENDPOINT, {
-                        method: 'POST',
-                        body: formData,
-                    });
+    <!-- Results -->
+    <div id="results-container" class="mt-6 hidden">
+      <h2 class="text-lg font-semibold text-gray-800 mb-3">Extraction Results</h2>
+      <div class="overflow-hidden border border-gray-200 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Field</th>
+              <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Value</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody" class="bg-white divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+    </div>
 
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
-                    }
+    <!-- Download Button -->
+    <a id="download-link" class="hidden mt-6 block text-center bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700" download>Download Results</a>
+  </div>
 
-                    const results = await response.json();
-                    const fileURL = URL.createObjectURL(file);
-                    updateUIState('success', { results, fileURL });
+  <!-- Load JSZip first -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+  integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-                } catch (error) {
-                    console.error('Upload failed:', error);
-                    updateUIState('error', error.message);
-                }
-            }
 
-            /**
-             * Renders the extracted data into the results container.
-             * @param {object} data - The JSON object with extracted data.
-             */
-            function displayResults(data) {
-                resultsDiv.innerHTML = ''; // Clear previous results
-                for (const [key, value] of Object.entries(data)) {
-                    const resultLine = document.createElement('div');
-                    const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    
-                    const keySpan = document.createElement('span');
-                    keySpan.className = 'result-key';
-                    keySpan.textContent = `${formattedKey}: `;
-                    
-                    const valueSpan = document.createElement('span');
-                    valueSpan.className = 'result-value';
-                    valueSpan.textContent = value || 'N/A';
-                    
-                    resultLine.appendChild(keySpan);
-                    resultLine.appendChild(valueSpan);
-                    resultsDiv.appendChild(resultLine);
-                }
-            }
-
-            // --- Event Listeners ---
-            pdfFileInput.addEventListener('change', (e) => {
-                processFile(e.target.files[0]);
-            });
-
-            resetButton.addEventListener('click', () => {
-                updateUIState('idle');
-            });
-
-            // Drag and Drop Event Listeners
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                uploadLabel.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }, false);
-            });
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                uploadLabel.addEventListener(eventName, () => {
-                    uploadLabel.classList.add('border-blue-500', 'bg-slate-600');
-                }, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                uploadLabel.addEventListener(eventName, () => {
-                     uploadLabel.classList.remove('border-blue-500', 'bg-slate-600');
-                }, false);
-            });
-            
-            uploadLabel.addEventListener('drop', (e) => {
-                const dt = e.dataTransfer;
-                const file = dt.files[0];
-                processFile(file);
-            }, false);
-
-        });
-    </script>
+  <!-- Your main script -->
+  <script src="script.js"></script>
 </body>
 </html>
+
