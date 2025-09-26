@@ -17,6 +17,8 @@ import (
 // InvoiceDetails holds the structured data extracted from the PDF.
 // Each field is tagged for JSON serialization.
 type InvoiceDetails struct {
+	InvoiceNumber  string `json:"invoice_number"`
+	InvoiceDate    string `json:"invoice_date"`
 	OrderNumber    string `json:"order_number"`
 	OrderDate      string `json:"order_date"`
 	BillingName    string `json:"billing_name"`
@@ -26,7 +28,7 @@ type InvoiceDetails struct {
 	TaxAmount      string `json:"tax_amount"`
 	TotalAmount    string `json:"total_amount"`
 	HSN            string `json:"hsn"`
-	UCode          string `json:"ucode"` // A unique product or item code.
+	ASN            string `json:"asn"` // A unique product or item code.
 }
 
 // sellerGSTIN is the GST number of the seller, used to avoid misattributing it to the client.
@@ -34,13 +36,15 @@ const sellerGSTIN = "19APGPS1824K1ZI"
 
 // pre-compiled regular expressions for efficient matching.
 var (
+	reInvoiceNumber = regexp.MustCompile(`(?i)Invoice\s*Number\s*[:\-]?\s*(\S+)`)
+	reInvoiceDate = regexp.MustCompile(`(?i)Invoice\s*Date\s*[:\-]?\s*([0-9]{2}[./-][0-9]{2}[./-][0-9]{4})`)
 	reOrderNo      = regexp.MustCompile(`(?i)Order\s*Number\s*[:\-]?\s*([A-Z0-9\-]+)`)
 	reOrderDate    = regexp.MustCompile(`(?i)Order\s*Date\s*[:\-]?\s*([0-9]{2}[./-][0-9]{2}[./-][0-9]{4})`)
 	reStateCode    = regexp.MustCompile(`(?i)State/UT\s*Code\s*[:\-]?\s*(\d{2})`)
 	reGST          = regexp.MustCompile(`(?i)GST(?:IN)?(?: Registration)? No\s*[:\-]?\s*(\S+)`)
 	reTaxAndTotal  = regexp.MustCompile(`(?i)TOTAL\s*[:\-]?\s*.*?([\d,]+\.\d{2})\s*.*?([\d,]+\.\d{2})`)
 	reHSN          = regexp.MustCompile(`(?i)HSN\s*[:\-]?\s*(\d+)`)
-	reUCode     = regexp.MustCompile(`\|\s*([A-Z0-9]{8,})\s*\(`)
+	reASN     = regexp.MustCompile(`\|\s*([A-Z0-9]{8,})\s*\(`)
 	reBillingBlock = regexp.MustCompile(`(?is)Billing Address\s*:\s*(.*?)\s*(?:Shipping Address|Invoice Number|State/UT Code)`)
 )
 
@@ -67,11 +71,13 @@ func ExtractDetails(file io.Reader) (*InvoiceDetails, error) {
 	details := &InvoiceDetails{}
 
 	// --- Parse simple, single-line fields from the 'simple' text layout ---
+	details.InvoiceNumber = findStringSubmatchAndClean(reInvoiceNumber, simpleText, 1)
+	details.InvoiceDate = findStringSubmatchAndClean(reInvoiceDate, simpleText, 1)
 	details.OrderNumber = findStringSubmatchAndClean(reOrderNo, simpleText, 1)
 	details.OrderDate = findStringSubmatchAndClean(reOrderDate, simpleText, 1)
 	details.StateCode = findStringSubmatchAndClean(reStateCode, simpleText, 1)
 	details.HSN = findStringSubmatchAndClean(reHSN, simpleText, 1)
-	details.UCode = findStringSubmatchAndClean(reUCode, simpleText, 1)
+	details.ASN = findStringSubmatchAndClean(reASN, simpleText, 1)
 
 	// Extract Tax and Total amounts from the "TOTAL" line.
 	if match := reTaxAndTotal.FindStringSubmatch(simpleText); len(match) >= 3 {
