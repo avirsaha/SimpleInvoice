@@ -1,28 +1,44 @@
 #!/bin/bash
 
-set -e  # exit on any error
+set -e
 
-echo "Building Go server..."
-go build -o server ./cmd/server
-echo "Go server built successfully."
+APP_NAME="simple_invoice"
+INSTALL_DIR="$HOME/.local/bin"
 
-echo "Setting up Python environment for tools..."
+echo "Building Go binary..."
+go build -o $APP_NAME ./cmd/server
+echo "Binary '$APP_NAME' built successfully."
+
+# Ensure ~/.local/bin exists
+mkdir -p "$INSTALL_DIR"
+
+# Move the binary to ~/.local/bin
+echo "Installing binary to $INSTALL_DIR..."
+mv $APP_NAME "$INSTALL_DIR/"
+
+# Make sure ~/.local/bin is in PATH
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+  echo "Warning: $INSTALL_DIR is not in your PATH."
+  echo "You can add it by adding this line to your shell profile (e.g., ~/.bashrc or ~/.zshrc):"
+  echo "export PATH=\"\$PATH:$INSTALL_DIR\""
+else
+  echo "You can now run the program with: $APP_NAME"
+fi
+
+# Python tool setup (optional)
+echo "Setting up Python environment..."
 cd tools
 
 if [ ! -d "venv" ]; then
-  echo "Creating Python virtual environment..."
   python3 -m venv venv
 fi
 
 source venv/bin/activate
 
-echo "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-echo "Python environment setup complete."
-
 cd ..
 
-echo "Setup completed successfully!"
+echo "Setup complete!"
 
