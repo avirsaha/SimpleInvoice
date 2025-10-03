@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"encoding/json"  // Debug
 )
 
 // InvoiceDetails holds the structured data extracted from the PDF.
@@ -44,7 +46,7 @@ var (
 	reGST          = regexp.MustCompile(`(?i)GST(?:IN)?(?: Registration)? No\s*[:\-]?\s*(\S+)`)
 	reTaxAndTotal  = regexp.MustCompile(`(?i)TOTAL\s*[:\-]?\s*.*?([\d,]+\.\d{2})\s*.*?([\d,]+\.\d{2})`)
 	reHSN          = regexp.MustCompile(`(?i)HSN\s*[:\-]?\s*(\d+)`)
-	reASN     = regexp.MustCompile(`\|\s*([A-Z0-9]{8,})\s*\(`)
+	reASN          = regexp.MustCompile(`[\|\s]+([A-Z0-9]{10})[\s]*(\(|₹)`)
 	reBillingBlock = regexp.MustCompile(`(?is)Billing Address\s*:\s*(.*?)\s*(?:Shipping Address|Invoice Number|State/UT Code)`)
 )
 
@@ -67,6 +69,12 @@ func ExtractDetails(file io.Reader) (*InvoiceDetails, error) {
 	if err != nil {
 		return nil, err
 	}
+		//  DEBUG: Print the raw extracted text
+	// fmt.Println("----- SIMPLE TEXT -----")
+	// fmt.Println(simpleText)
+
+	// fmt.Println("----- COLUMN TEXT -----")
+	// fmt.Println(columnText)
 
 	details := &InvoiceDetails{}
 
@@ -95,6 +103,14 @@ func ExtractDetails(file io.Reader) (*InvoiceDetails, error) {
 		if !strings.EqualFold(gst, sellerGSTIN) {
 			details.GSTNOClient = gst
 		}
+	}
+	// DEBUG: Print the extracted details as JSON
+	jsonData, err := json.MarshalIndent(details, "", "  ")
+	if err != nil {
+		fmt.Println("Failed to marshal details to JSON:", err)
+	} else {
+		fmt.Println("Extracted InvoiceDetails (JSON):")
+		fmt.Println(string(jsonData))
 	}
 
 	return details, nil

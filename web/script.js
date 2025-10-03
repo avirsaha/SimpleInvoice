@@ -1,4 +1,3 @@
-// script.js
 document.addEventListener('DOMContentLoaded', () => {
   const API_ENDPOINT = 'http://localhost:8000/extract/';
   const fileInput = document.getElementById('file-input');
@@ -38,7 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function processFiles(fileList) {
     resetUI();
-    const files = Array.from(fileList).filter(file => file.type === "application/pdf");
+    const files = Array.from(fileList).filter(file =>
+      file.name.toLowerCase().endsWith('.pdf')
+    );
+
     if (files.length === 0) {
       showError("No PDF files detected.");
       return;
@@ -53,12 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (files.length === 1) {
         showResultsTable(allJsonResults[0]);
-        const blob = generateAggregatedExcelBlob(allJsonResults, allFilenames);
-        triggerDownload(blob, "invoice.csv");
+        const blob = generateExcelBlob(allJsonResults, allFilenames);
+        triggerDownload(blob, "invoice.xlsx");
         logStatus("Done. Download ready.");
       } else {
-        const blob = generateAggregatedExcelBlob(allJsonResults, allFilenames);
-        triggerDownload(blob, "all_invoices.csv");
+        const blob = generateExcelBlob(allJsonResults, allFilenames);
+        triggerDownload(blob, "all_invoices.xlsx");
         logStatus("Done. Download ready.");
       }
 
@@ -82,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error(`Error processing ${file.name}: ` + (JSON.parse(text).error || text));
     }
 
-    return JSON.parse(text); // Return only the JSON
+    return JSON.parse(text);
   }
 
   function showResultsTable(data) {
@@ -98,8 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsContainer.classList.remove('hidden');
   }
 
-  function generateAggregatedExcelBlob(dataArray, filenames) {
-    const rows = [];
+  function generateExcelBlob(dataArray, filenames) {
+    const wsData = [];
     const headerSet = new Set(["Filename"]);
 
     dataArray.forEach(data => {
@@ -107,18 +109,64 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const headers = Array.from(headerSet);
-    rows.push(headers);
+    wsData.push(headers);
 
     dataArray.forEach((data, i) => {
       const row = headers.map(h => {
         if (h === "Filename") return filenames[i];
         return data[h] || '';
       });
-      rows.push(row);
+      wsData.push(row);
     });
 
-    const csvContent = rows.map(r => r.map(cell => `"${cell}"`).join(',')).join('\n');
-    return new Blob([csvContent], { type: 'text/csv' });
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    headers.forEach((header, colIdx) => {
+      const isDateColumn = header.toLowerCase().includes('date');
+      const isAmountColumn = ["amount", "total", "price"].some(k => header.toLowerCase().includes(k));
+
+      for (let rowIdx = 1; rowIdx < wsData.length; rowIdx++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
+        const cell = ws[cellAddress];
+        if (!cell) continue;
+
+        const rawValue = cell.v;
+
+        if (isDateColumn && typeof rawValue === 'string') {
+          let parsedDate = null;
+
+          const ddmmyyyyMatch = rawValue.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+          if (ddmmyyyyMatch) {
+            const [_, d, m, y] = ddmmyyyyMatch;
+            parsedDate = new Date(`${y}-${m}-${d}`);
+          } else {
+            parsedDate = new Date(rawValue);
+          }
+
+          if (!isNaN(parsedDate)) {
+            cell.v = parsedDate;
+            cell.t = 'd';
+            cell.z = XLSX.SSF._table[14]; // m/d/yy
+          }
+        }
+
+        if (isAmountColumn && typeof rawValue === 'string') {
+          const num = parseFloat(rawValue.replace(/[^\d.-]/g, ''));
+          if (!isNaN(num)) {
+            cell.v = num;
+            cell.t = 'n';
+          }
+        }
+      }
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Invoices");
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    return new Blob([wbout], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
   }
 
   function triggerDownload(blob, filename) {
@@ -141,11 +189,65 @@ document.addEventListener('DOMContentLoaded', () => {
     dropArea.classList.remove('border-indigo-500');
   });
 
-  dropArea.addEventListener('drop', e => {
+  dropArea.addEventListener('drop', async (e) => {
     e.preventDefault();
     dropArea.classList.remove('border-indigo-500');
-    const files = e.dataTransfer.files;
-    processFiles(files);
+
+    const items = e.dataTransfer.items;
+    if (!items || items.length === 0) {
+      showError("No items dropped.");
+      return;
+    }
+
+    try {
+      const files = await getAllFilesFromItems(items);
+      processFiles(files);
+    } catch (err) {
+      showError("Failed to read dropped files: " + err.message);
+    }
   });
+
+  // Helper to recursively read dropped folders
+  async function getAllFilesFromItems(items) {
+    const filePromises = [];
+
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry?.();
+      if (entry) {
+        filePromises.push(...(await traverseFileTree(entry)));
+      }
+    }
+
+    const allFiles = await Promise.all(filePromises);
+    return allFiles.filter(f => f);
+  }
+
+  function traverseFileTree(item, path = '') {
+    return new Promise((resolve) => {
+      if (item.isFile) {
+        item.file(file => resolve([file]), () => resolve([]));
+      } else if (item.isDirectory) {
+        const dirReader = item.createReader();
+        const entries = [];
+
+        const readEntries = () => {
+          dirReader.readEntries(async results => {
+            if (!results.length) {
+              const promises = entries.map(entry => traverseFileTree(entry, path + item.name + "/"));
+              const nestedFiles = await Promise.all(promises);
+              resolve(nestedFiles.flat());
+            } else {
+              entries.push(...results);
+              readEntries();
+            }
+          }, () => resolve([]));
+        };
+
+        readEntries();
+      } else {
+        resolve([]);
+      }
+    });
+  }
 });
 
